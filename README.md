@@ -2,8 +2,9 @@
 
 ## This isn't complicated
 
-Due to a lack of quality reference AWS architecture diagrams for running Superset, I took it upon myself to hammer out a very basic setup on AWS. The main goal was to remain as automated as possible with serverless/managed solutions.
-You will probably need to adjust this for your needs, don't run this OOB in production unless you want to have a bad time.
+After stumpling upon the [aws-ia](https://github.com/aws-ia) reference architecture for [Superset](https://aws-ia.github.io/cfn-ps-apache-superset/) which is arguably one of the worst reference architectures I have ever seen, I took it upon myself to hammer out a very basic setup on AWS which is truly serverless, scalable, and all the good buzzwords.
+
+The main goal was to remain as automated as possible with serverless/managed solutions. You will probably need to adjust this for your needs, don't run this OOB in production unless you want to have a bad time.
 
 Cloudfront is configured to respect Cache headers but should be tuned as necessary along with caching, memory, and all the usual things a competent engineer is capable of figuring out.
 
