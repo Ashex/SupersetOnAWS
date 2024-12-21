@@ -54,6 +54,7 @@ export class EnSupersetStack extends Stack {
     const supersetMinCapacity = props.supersetMinCapacity || 1;
     const supersetMaxCapacity = props.supersetMaxCapacity || 2;
     const supersetDesiredCount = props.supersetDesiredCount || 1;
+    const supersetUrl = `https://superset.${r53DomainName}/`;
 
     
     
@@ -347,6 +348,7 @@ export class EnSupersetStack extends Stack {
         DATABASE_HOST: dbCluster.clusterEndpoint.hostname,
         DATABASE_PORT: dbCluster.clusterEndpoint.port.toString(),
         DATABASE_DB: 'superset_db',
+        PUBLIC_URL: supersetUrl,
       },
       secrets: {  
         DATABASE_PASSWORD: ecs.Secret.fromSecretsManager(supersetDatabaseUserSecret, 'password'),
@@ -570,12 +572,12 @@ export class EnSupersetStack extends Stack {
       description: 'The domain name of the CloudFront distribution'
     });
 
+
     if (r53DomainName) {
-      new CfnOutput(this, 'R53DNSName', {
+    new CfnOutput(this, 'R53DNSName', {
         value: `https://superset.${r53DomainName}/`,
         description: 'The DNS record for superset'
       });
-    }
 
 
   }
