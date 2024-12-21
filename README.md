@@ -25,6 +25,8 @@ There are several Alarms with somewhat decent defaults, they do not go anywhere 
 | auroraInstanceType | t4g.large           | String  | The instance type for Aurora, without db. prefix                            |
 | supersetMemoryLimit| 2048                | Number  | Memory Limit for Superset Service                                           |
 | supersetCPU        | 1024                | Number  | CPU allocation for Superset Service                                         |
+| supersetMinCapacity| 1                   | Number  | Minimum number of tasks for the service                                     |
+| supersetMaxCapacity| 2                   | Number  | Maximum number of tasks for the service                                     |
 | r53DomainName      | none                | String  | (Optional) The Route53 DomainName to use for the CloudFront distribution    |
 | ACMCertArn         | none                | String  | (Optional) The ACM certificate arn to use for the CloudFront distribution    |
 | vpcIdParameter     | /base/network/vpcId | String  | The Parameter with VPC ID to use for the stack                              |
@@ -41,12 +43,12 @@ There are several Alarms with somewhat decent defaults, they do not go anywhere 
 
 Build the superset container under `src` and push it to a (ECR) repository and provide the arn including tag in `ContainerImage`. 
 There is the assumption that you have the VPCId stored in parameter store and so provide the parameter name. Set `envName` appropriately then diff, deploy, and pray.
+Using the construct [cdk-rds-sql](https://github.com/berenddeboer/cdk-rds-sql), a dedicated user for superset is created with the necessary permissions.
 
 ## Bootsrapping
 
 The `FirstRun` parameters controls if the following is done when set to True:
 
-* Create a dedicated user for superset with the necessary permissions using the construct [cdk-rds-sql](https://github.com/berenddeboer/cdk-rds-sql).
 * Adjusts the task command to create the admin user with the password admin.
 
 After first launch, change this setting to false.

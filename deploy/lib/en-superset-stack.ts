@@ -26,11 +26,14 @@ export interface EnSupersetStackProps extends StackProps {
   auroraInstanceType?: string; // The instance type for Aurora, without db. prefix
   supersetMemoryLimit?: number; // Memory Limit for Superset Service
   supersetCPU?: number; // CPU allocation for Superset Service
+  supersetMinCapacity?: number; // Minimum number of tasks for the service
+  supersetMaxCapacity?: number; // Maximum number of tasks for the service
   r53DomainName?: string; // (Optional) The Route53 DomainName to use for the CloudFront distribution
   ACMCertArn?: string; // (Optional) The ACM certificate arn to use for the CloudFront distribution
   vpcIdParameter?: string; // The Parameter with VPC ID to use for the stack
   ContainerImage: string; // The container image to use for the Superset service
   FirstRun?: boolean; // If true, create the admin user and initialize the database
+  
 }
 
 export class EnSupersetStack extends Stack {
@@ -47,6 +50,8 @@ export class EnSupersetStack extends Stack {
     const vpcIdParameter = props.vpcIdParameter || '/base/network/vpcId';
     const ContainerImage = props.ContainerImage ;
     const FirstRun = props.FirstRun || false;
+    const supersetMinCapacity = props.supersetMinCapacity || 1;
+    const supersetMaxCapacity = props.supersetMaxCapacity || 2;
 
     
     
@@ -339,7 +344,22 @@ export class EnSupersetStack extends Stack {
       },
       securityGroups: [serviceSecurityGroup],
       healthCheckGracePeriod: Duration.minutes(5),
-      circuitBreaker: { rollback: true }
+      circuitBreaker: { rollback: true },
+    });
+
+    // Configure some simple scaling
+
+    const scaling = fargateService.autoScaleTaskCount({
+      minCapacity: (FirstRun) ? 1: supersetMinCapacity,
+      maxCapacity: (FirstRun) ? 1: supersetMaxCapacity,
+    });
+
+    scaling.scaleOnCpuUtilization('CpuScaling', {
+      targetUtilizationPercent: 60
+    });
+
+    scaling.scaleOnMemoryUtilization('MemoryScaling', {
+      targetUtilizationPercent: 80
     });
 
     fargateService.node.addDependency(dbCluster);
@@ -347,6 +367,7 @@ export class EnSupersetStack extends Stack {
     fargateService.node.addDependency(provider);
 
     // Expose the service via an Application Load Balancer through Cloudfront
+    // TODO: Switch to private origin once CDK supports it
 
     const loadBalancer = new elbv2.ApplicationLoadBalancer(this, `superset-ALB`, {
       loadBalancerName: `superset-${envName}`,
@@ -371,8 +392,6 @@ export class EnSupersetStack extends Stack {
         unhealthyThresholdCount: 5
       }
     });
-
-
 
 
 
