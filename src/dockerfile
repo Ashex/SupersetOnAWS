@@ -1,0 +1,23 @@
+# Use the official Apache Superset image as the base
+# FROM apache/superset:latest
+FROM apache/superset:4.1.1
+
+
+# Install dependencies for Athena
+USER root
+RUN apt-get update && apt-get install -y sudo vim \
+    && pip install "PyAthena[SQLAlchemy]" \
+    && pip install "pyathena[pandas]" \
+    && pip install "PyAthenaJDBC"    \
+    && pip install prophet  \
+    && pip install psycopg2-binary
+
+# Add the superset_config.py file from the current directory
+# this helps us to overide default parameters and configurations
+COPY superset/superset_config.py /app/pythonpath/superset_config.py
+
+# Switch back to the superset user
+USER superset
+
+# Expose the port that superset runs on
+EXPOSE 8088
