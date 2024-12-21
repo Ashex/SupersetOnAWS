@@ -28,6 +28,7 @@ export interface EnSupersetStackProps extends StackProps {
   supersetCPU?: number; // CPU allocation for Superset Service
   supersetMinCapacity?: number; // Minimum number of tasks for the service
   supersetMaxCapacity?: number; // Maximum number of tasks for the service
+  supersetDesiredCount?: number; // Desired number of tasks for the service
   r53DomainName?: string; // (Optional) The Route53 DomainName to use for the CloudFront distribution
   ACMCertArn?: string; // (Optional) The ACM certificate arn to use for the CloudFront distribution
   vpcIdParameter?: string; // The Parameter with VPC ID to use for the stack
@@ -43,8 +44,8 @@ export class EnSupersetStack extends Stack {
     const envName = props.envName;
     const redisInstanceType = props.redisInstanceType || 'cache.t4g.medium';
     const auroraInstanceType = props.auroraInstanceType || 't4g.large';
-    const supersetMemoryLimit = props.supersetMemoryLimit || 2048;
-    const supersetCPU = props.supersetCPU || 1024;
+    const supersetMemoryLimit = props.supersetMemoryLimit || 8192;
+    const supersetCPU = props.supersetCPU || 2048;
     const r53DomainName = props.r53DomainName || 'none';
     const ACMCertArn = props.ACMCertArn || 'none';
     const vpcIdParameter = props.vpcIdParameter || '/base/network/vpcId';
@@ -52,6 +53,7 @@ export class EnSupersetStack extends Stack {
     const FirstRun = props.FirstRun || false;
     const supersetMinCapacity = props.supersetMinCapacity || 1;
     const supersetMaxCapacity = props.supersetMaxCapacity || 2;
+    const supersetDesiredCount = props.supersetDesiredCount || 1;
 
     
     
@@ -337,7 +339,7 @@ export class EnSupersetStack extends Stack {
       serviceName: `superset-${envName}`,
       cluster: supersetEcsCluster,
       taskDefinition: taskDefinition,
-      desiredCount: (FirstRun) ? 1: 2, // Only one task for the first run
+      desiredCount: (FirstRun) ? 1: supersetDesiredCount, // Only one task for the first run
       assignPublicIp: false,
       vpcSubnets: {
         subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS

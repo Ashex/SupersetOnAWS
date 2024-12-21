@@ -27,6 +27,7 @@ There are several Alarms with somewhat decent defaults, they do not go anywhere 
 | supersetCPU        | 1024                | Number  | CPU allocation for Superset Service                                         |
 | supersetMinCapacity| 1                   | Number  | Minimum number of tasks for the service                                     |
 | supersetMaxCapacity| 2                   | Number  | Maximum number of tasks for the service                                     |
+| supersetDesiredCount| 1                  | Number  | Desired number of tasks for the service                                     |
 | r53DomainName      | none                | String  | (Optional) The Route53 DomainName to use for the CloudFront distribution    |
 | ACMCertArn         | none                | String  | (Optional) The ACM certificate arn to use for the CloudFront distribution    |
 | vpcIdParameter     | /base/network/vpcId | String  | The Parameter with VPC ID to use for the stack                              |
