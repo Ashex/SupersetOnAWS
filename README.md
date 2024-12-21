@@ -8,7 +8,6 @@ The main goal was to remain as automated as possible with serverless/managed sol
 
 Cloudfront is configured to respect Cache headers but should be tuned as necessary along with caching, memory, and all the usual things a competent engineer is capable of figuring out.
 
-There are several Alarms with somewhat decent defaults, they do not go anywhere so configure the alarm target with a SNS topic with destinations (slack, opsgenie, etc.).
 
 ## Architecture
 
@@ -42,11 +41,11 @@ There are several Alarms with somewhat decent defaults, they do not go anywhere 
 
 ## Launching
 
-Build the superset container under `src` and push it to a (ECR) repository and provide the arn including tag in `ContainerImage`. 
+Build the superset container under `src` and push it to a (ECR) repository and provide the arn including tag in `ContainerImage`.  
 There is the assumption that you have the VPCId stored in parameter store and so provide the parameter name. Set `envName` appropriately then diff, deploy, and pray.
 Using the construct [cdk-rds-sql](https://github.com/berenddeboer/cdk-rds-sql), a dedicated user for superset is created with the necessary permissions.
 
-## Bootsrapping
+## Bootstrapping
 
 The `FirstRun` parameters controls if the following is done when set to True:
 
@@ -56,10 +55,16 @@ After first launch, change this setting to false.
 
 ## SSL
 
-We're doing some [cross-region magic](https://github.com/aws/aws-cdk/tree/8d55d864183803e2e6cfb3991edced7496eaadeb/packages/aws-cdk-lib#accessing-resources-in-a-different-stack-and-region) 
+We're doing some [cross-region magic](https://github.com/aws/aws-cdk/tree/8d55d864183803e2e6cfb3991edced7496eaadeb/packages/aws-cdk-lib#accessing-resources-in-a-different-stack-and-region)  
 to create the ACM certificate for Cloudfront, the key piece to set is `r53DomainName` and the record is constructed with it.
 
 If for whatever reason you can't do automatic ACM certificate creation with r53 dns validation, rip out the acmStack and do it the hard way.
+
+## Monitoring
+
+There are several Alarms with somewhat decent defaults, they do not go anywhere so configure the alarm target with a SNS topic with destinations (slack, opsgenie, etc.).
+
+A couple Log Insights queries are created with the prefix `superset/` which simply excludes the http request logs for easier troubleshooting.
 
 ## Shout Outs
 

@@ -17,7 +17,7 @@ import { Stack, StackProps, Fn, CfnCondition, CfnOutput,
         Tags, RemovalPolicy, Duration } from 'aws-cdk-lib';
 import { StringParameter } from 'aws-cdk-lib/aws-ssm';
 import { Provider, Role, Database, Schema } from 'cdk-rds-sql';
-import { RetentionDays, LogGroup } from 'aws-cdk-lib/aws-logs';
+import { RetentionDays, LogGroup, CfnQueryDefinition } from 'aws-cdk-lib/aws-logs';
 import { AwsCustomResource, AwsCustomResourcePolicy, PhysicalResourceId } from 'aws-cdk-lib/custom-resources';
 
 export interface EnSupersetStackProps extends StackProps {
@@ -61,10 +61,6 @@ export class EnSupersetStack extends Stack {
     // Route53 Zone and ACM Certificate, must set both of them to use SSL
     // The assumption is that the actual r53 record is created outside this stack but
     // we need to set the dns name with the certificate in cloudfront on creation
-
-    const isProductionCondition = new CfnCondition(this, 'IsProd', {
-      expression: Fn.conditionEquals(envName, 'production'),
-    });
 
     const vpc = ec2.Vpc.fromLookup(this, 'Vpc', {
       vpcId: StringParameter.valueFromLookup(this, vpcIdParameter),
@@ -290,6 +286,34 @@ export class EnSupersetStack extends Stack {
       TaskCommand = '/usr/bin/run-server.sh && superset db upgrade && superset init'
     }
 
+    const SupersetLogGroup = new LogGroup(this, `superset-LogGroup`, {
+      logGroupName: `/ecs/${envName}/superset`,
+      removalPolicy: RemovalPolicy.DESTROY
+    })
+
+    // Log Insights Query which filters out all the health checks
+    new CfnQueryDefinition(this, 'LogQueryExcHealth', {
+      name: 'superset/ExcludeHealthChecks',
+      queryString: `fields @timestamp, @message
+                  | sort @timestamp desc
+                  | filter @message not like "GET /health HTTP/1.1"
+                  | limit 10000`,
+    
+      logGroupNames: [SupersetLogGroup.logGroupName],
+    });
+
+    // Log Insights Query which filters out all the HTTP requests
+    new CfnQueryDefinition(this, 'LogQueryExcHTTP', {
+      name: 'superset/ExcludeHTTPRequests',
+      queryString: `fields @timestamp, @message
+                  | sort @timestamp desc
+                  | filter @message not like /^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/
+                  | limit 10000`,
+    
+      logGroupNames: [SupersetLogGroup.logGroupName],
+    });
+
+
     taskDefinition.addContainer('SupersetContainer', {
       containerName: 'Superset',
       image: ecs.ContainerImage.fromRegistry(ContainerImage),
@@ -302,10 +326,7 @@ export class EnSupersetStack extends Stack {
       },
       logging: new ecs.AwsLogDriver({
         streamPrefix: 'ecs',
-        logGroup: new LogGroup(this, `superset-LogGroup`, {
-          logGroupName: `/ecs/${envName}/superset`,
-          removalPolicy: RemovalPolicy.DESTROY
-        })
+        logGroup: SupersetLogGroup
       }),
       portMappings: [
         {
