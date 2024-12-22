@@ -1,6 +1,4 @@
-import { Construct } from 'constructs';
 import * as ecs from 'aws-cdk-lib/aws-ecs';
-import { InstanceType } from 'aws-cdk-lib/aws-ec2';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as elbv2 from 'aws-cdk-lib/aws-elasticloadbalancingv2';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
@@ -12,6 +10,7 @@ import * as rds from 'aws-cdk-lib/aws-rds';
 import * as elasticache from 'aws-cdk-lib/aws-elasticache';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as r53 from 'aws-cdk-lib/aws-route53';
+import { Construct } from 'constructs';
 import { CloudFrontTarget } from 'aws-cdk-lib/aws-route53-targets';
 import { Stack, StackProps, Fn, CfnCondition, CfnOutput,
         Tags, RemovalPolicy, Duration } from 'aws-cdk-lib';
@@ -179,7 +178,7 @@ export class EnSupersetStack extends Stack {
       }),
       writer: rds.ClusterInstance.provisioned( 'writer',{
         instanceIdentifier: `superset-${envName}-writer`,
-        instanceType: new InstanceType(auroraInstanceType),
+        instanceType: new ec2.InstanceType(auroraInstanceType),
       }),
       vpcSubnets: {
         subnetType: ec2.SubnetType.PRIVATE_ISOLATED
@@ -572,13 +571,13 @@ export class EnSupersetStack extends Stack {
       description: 'The domain name of the CloudFront distribution'
     });
 
-
+    
     if (r53DomainName) {
     new CfnOutput(this, 'R53DNSName', {
         value: `https://superset.${r53DomainName}/`,
         description: 'The DNS record for superset'
       });
-
+    }
 
   }
 }
