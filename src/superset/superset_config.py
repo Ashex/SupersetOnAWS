@@ -25,6 +25,7 @@ import os
 
 from celery.schedules import crontab
 from flask_caching.backends.rediscache import RedisCache
+from ssl import CERT_OPTIONAL
 
 logger = logging.getLogger()
 
@@ -174,6 +175,7 @@ FEATURE_FLAGS: dict[str, bool] = {
     # caution. If the feature is enabled you can also set a limit for how much data is
     # returned from each database in the ``SUPERSET_META_DB_LIMIT`` configuration value
     # in this file.
+    # https://superset.apache.org/docs/configuration/databases/#enabling-the-meta-database
     "ENABLE_SUPERSET_META_DB": False,
     # Set to True to replace Selenium with Playwright to execute reports and thumbnails.
     # Unlike Selenium, Playwright reports support deck.gl visualizations
