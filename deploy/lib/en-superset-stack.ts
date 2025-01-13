@@ -288,7 +288,7 @@ export class EnSupersetStack extends Stack {
 
     const SupersetLogGroup = new LogGroup(this, `superset-LogGroup`, {
       logGroupName: `/ecs/${envName}/superset`,
-      removalPolicy: RemovalPolicy.DESTROY
+      removalPolicy: RemovalPolicy.RETAIN
     })
 
     // Log Insights Query which filters out all the health checks
