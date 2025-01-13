@@ -273,6 +273,10 @@ export class EnSupersetStack extends Stack {
     const taskDefinition = new ecs.FargateTaskDefinition(this, `superset-SupersetTaskDefinition`, {
       memoryLimitMiB: supersetMemoryLimit,
       cpu: supersetCPU,
+      runtimePlatform: {
+        operatingSystemFamily: ecs.OperatingSystemFamily.LINUX,
+        cpuArchitecture: ecs.CpuArchitecture.ARM64
+      },
       executionRole: executionRole,
       taskRole: taskRole,
       family: 'superset'
@@ -368,7 +372,10 @@ export class EnSupersetStack extends Stack {
       },
       securityGroups: [serviceSecurityGroup],
       healthCheckGracePeriod: Duration.minutes(5),
-      circuitBreaker: { rollback: true },
+      circuitBreaker: {
+        enable: true,
+        rollback: true 
+      },
     });
 
     // Configure some simple scaling
@@ -465,6 +472,7 @@ export class EnSupersetStack extends Stack {
     }
 
     // CloudWatch Alarms
+    // TODO: Add generator with automatic dependency
     new cloudwatch.Alarm(this, `superset-TaskCpuUtilizationAlarm`, {
       alarmName: `superset-${envName}-TaskCpuUtilizationAlarm`,
       metric: fargateService.metricCpuUtilization(),
