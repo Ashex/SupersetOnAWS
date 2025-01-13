@@ -66,6 +66,22 @@ There are several Alarms with somewhat decent defaults, they do not go anywhere 
 
 A couple Log Insights queries are created with the prefix `superset/` which simply excludes the http request logs for easier troubleshooting.
 
+## Scaling
+
+While this is a single task deployment, you likely need to scale for query performance. To do so, you will need to add [dedicated celery workers](https://superset.apache.org/docs/configuration/async-queries-celery/) to support asynchronous queries which are long running. You can effectively reuse the existing task definition but change the task command to the following:
+
+```bash
+celery --app=superset.tasks.celery_app:app worker --pool=prefork -O fair -c 4
+```
+
+If you need to have a dedicated scheduler, use the following task command:
+
+```bash
+celery --app=superset.tasks.celery_app:app beat
+```
+
+However review the linked documentation as CeleryConfig should be adjusted per your requirements (if you want to stick with one image build, consider adding additional config files that can be improted based off a type variable to override config).
+
 ## Shout Outs
 
 * Anil Augustine Chalissery for his AWS in Plain English [post](https://aws.plainenglish.io/how-to-deploy-apache-superset-on-aws-ecs-08da76bedd32) that got me started.
