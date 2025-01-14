@@ -12,7 +12,7 @@ import * as iam from 'aws-cdk-lib/aws-iam';
 import * as r53 from 'aws-cdk-lib/aws-route53';
 import { Construct } from 'constructs';
 import { CloudFrontTarget } from 'aws-cdk-lib/aws-route53-targets';
-import { Stack, StackProps, Fn, CfnCondition, CfnOutput,
+import { Stack, StackProps, CfnOutput,
         Tags, RemovalPolicy, Duration } from 'aws-cdk-lib';
 import { StringParameter } from 'aws-cdk-lib/aws-ssm';
 import { Provider, Role, Database, Schema } from 'cdk-rds-sql';
@@ -21,7 +21,9 @@ import { AwsCustomResource, AwsCustomResourcePolicy, PhysicalResourceId } from '
 
 export interface EnSupersetStackProps extends StackProps {
   envName: string; // The environment name (e.g., development, staging, production)
-  redisInstanceType?: string; // The instance type for Redis
+  cacheInstanceType?: string; // The instance type for Elasticache
+  cacheNodeGroups?: number; // The number of node groups (shards) for Elasticache
+  cacheNodeReplicas?: number; // The number of replicas per node group for Elasticache
   auroraInstanceType?: string; // The instance type for Aurora, without db. prefix
   supersetMemoryLimit?: number; // Memory Limit for Superset Service
   supersetCPU?: number; // CPU allocation for Superset Service
@@ -41,7 +43,9 @@ export class EnSupersetStack extends Stack {
     super(scope, id, props);
 
     const envName = props.envName;
-    const redisInstanceType = props.redisInstanceType || 'cache.t4g.medium';
+    const cacheInstanceType = props.cacheInstanceType || 'cache.t4g.medium';
+    const cacheNodeGroups = props.cacheNodeGroups || 1;
+    const cacheNodeReplicas = props.cacheNodeReplicas || 2;
     const auroraInstanceType = props.auroraInstanceType || 't4g.large';
     const supersetMemoryLimit = props.supersetMemoryLimit || 8192;
     const supersetCPU = props.supersetCPU || 2048;
@@ -67,11 +71,11 @@ export class EnSupersetStack extends Stack {
     });
 
     // Security Groups
-    const redisSecurityGroup = new ec2.SecurityGroup(this, `superset-RedisSecurityGroup`, {
+    const cacheSecurityGroup = new ec2.SecurityGroup(this, `superset-cacheSecurityGroup`, {
       vpc
     });
 
-    Tags.of(redisSecurityGroup).add('Name', `superset-redis-${envName}`);
+    Tags.of(cacheSecurityGroup).add('Name', `superset-cache-${envName}`);
 
     const serviceSecurityGroup = new ec2.SecurityGroup(this, `superset-ServiceSecurityGroup`, {
       vpc
@@ -131,10 +135,10 @@ export class EnSupersetStack extends Stack {
       toPort: 5432
     });
 
-    new ec2.CfnSecurityGroupIngress(this, `superset-redisSecurityGroupIngress`, {
-      groupId: redisSecurityGroup.securityGroupId,
+    new ec2.CfnSecurityGroupIngress(this, `superset-cacheSecurityGroupIngress`, {
+      groupId: cacheSecurityGroup.securityGroupId,
       sourceSecurityGroupId: serviceSecurityGroup.securityGroupId,
-      description: 'Allow superset service to access the Redis cluster',
+      description: 'Allow superset service to access the Cache cluster',
       ipProtocol: 'tcp',
       fromPort: 6379,
       toPort: 6379
@@ -221,16 +225,26 @@ export class EnSupersetStack extends Stack {
     })
 
 
-    const redisCluster = new elasticache.CfnCacheCluster(this, `superset-RedisCluster`, {
-      clusterName: `superset-${envName}`,
-      cacheNodeType: redisInstanceType,
-      engine: 'redis',
-      numCacheNodes: 1,
-      cacheSubnetGroupName: new elasticache.CfnSubnetGroup(this, `superset-RedisSubnetGroup`, {
-        description: 'Subnet group for Redis cluster',
+    const cacheCluster = new elasticache.CfnReplicationGroup(this, "superset-CacheCluster", {
+      replicationGroupDescription: 'Superset Cache Cluster',
+      engine: "valkey",
+      engineVersion: "7.2",
+      replicationGroupId: `superset-cache-${envName}`,
+      cacheNodeType: cacheInstanceType,
+      cacheSubnetGroupName: new elasticache.CfnSubnetGroup(this, `superset-CacheSubnetGroup`, {
+        description: 'Superset Cache cluster',
         subnetIds: vpc.privateSubnets.map(subnet => subnet.subnetId)
       }).ref,
-      vpcSecurityGroupIds: [redisSecurityGroup.securityGroupId]
+      cacheParameterGroupName: new elasticache.CfnParameterGroup(this, "superset-CacheParameterGroup", {
+        description: 'Superset Cache Cluster',
+        cacheParameterGroupFamily: "valkey7",
+      }).ref,
+      numNodeGroups: cacheNodeGroups,
+      replicasPerNodeGroup: cacheNodeReplicas,
+      multiAzEnabled: (cacheNodeGroups > 1) ? true: false,
+      securityGroupIds: [cacheSecurityGroup.securityGroupId],
+      atRestEncryptionEnabled: true,
+      transitEncryptionEnabled: true,
     });
 
     const supersetEcsCluster = new ecs.Cluster(this, `superset-ecs-cluster`, {
@@ -292,7 +306,7 @@ export class EnSupersetStack extends Stack {
 
     const SupersetLogGroup = new LogGroup(this, `superset-LogGroup`, {
       logGroupName: `/ecs/${envName}/superset`,
-      removalPolicy: RemovalPolicy.RETAIN
+      removalPolicy: RemovalPolicy.DESTROY
     })
 
     // Log Insights Query which filters out all the health checks
@@ -340,7 +354,7 @@ export class EnSupersetStack extends Stack {
         }
       ],
       environment: {
-        REDIS_HOST: redisCluster.attrRedisEndpointAddress,
+        REDIS_HOST: cacheCluster.attrPrimaryEndPointAddress,
         DATABASE_DIALECT: 'postgresql',
         REDIS_PORT: '6379',
         REDIS_RESULTS_DB: '1',
@@ -394,7 +408,7 @@ export class EnSupersetStack extends Stack {
     });
 
     fargateService.node.addDependency(dbCluster);
-    fargateService.node.addDependency(redisCluster);
+    fargateService.node.addDependency(cacheCluster);
     fargateService.node.addDependency(provider);
 
     // Expose the service via an Application Load Balancer through Cloudfront
@@ -503,36 +517,36 @@ export class EnSupersetStack extends Stack {
       alarmDescription: 'Alarm if task 5xx count exceeds 5 datapoints'
     });
 
-    new cloudwatch.Alarm(this, `superset-RedisCpuUtilizationAlarm`, {
-      alarmName: `superset-${envName}-RedisCpuUtilizationAlarm`,
+    new cloudwatch.Alarm(this, `superset-CacheCpuUtilizationAlarm`, {
+      alarmName: `superset-${envName}-CacheCpuUtilizationAlarm`,
       metric: new cloudwatch.Metric({
         namespace: 'AWS/ElastiCache',
         metricName: 'CPUUtilization',
         dimensionsMap: {
-          CacheClusterId: redisCluster.ref
+          CacheClusterId: cacheCluster.ref
         }
       }),
       threshold: 60,
       evaluationPeriods: 3,
       datapointsToAlarm: 1,
       comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
-      alarmDescription: 'Alarm if Redis CPU utilization exceeds 60%'
+      alarmDescription: 'Alarm if Cache CPU utilization exceeds 60%'
     });
 
-    new cloudwatch.Alarm(this, `superset-RedisMemoryUtilizationAlarm`, {
-      alarmName: `superset-${envName}-RedisMemoryUtilizationAlarm`,
+    new cloudwatch.Alarm(this, `superset-CacheMemoryUtilizationAlarm`, {
+      alarmName: `superset-${envName}-CacheMemoryUtilizationAlarm`,
       metric: new cloudwatch.Metric({
         namespace: 'AWS/ElastiCache',
         metricName: 'DatabaseMemoryUsagePercentage',
         dimensionsMap: {
-          CacheClusterId: redisCluster.ref
+          CacheClusterId: cacheCluster.ref
         }
       }),
       threshold: 80,
       evaluationPeriods: 3,
       datapointsToAlarm: 1,
       comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
-      alarmDescription: 'Alarm if Redis memory utilization exceeds 80%'
+      alarmDescription: 'Alarm if Cache memory utilization exceeds 80%'
     });
 
     new cloudwatch.Alarm(this, `superset-AuroraCpuUtilizationAlarm`, {

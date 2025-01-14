@@ -20,10 +20,12 @@ Cloudfront is configured to respect Cache headers but should be tuned as necessa
 | Name               | Defaults            | Type    | Description                                                                 |
 |--------------------|---------------------|---------|-----------------------------------------------------------------------------|
 | envName            | -                   | String  | The environment name (e.g., development, staging, production)               |
-| redisInstanceType  | cache.t4g.medium    | String  | The instance type for Redis                                                 |
+| cacheInstanceType  | cache.t4g.medium    | String  | The instance type for Elasticache                                           |
+| cacheNodeGroups    | 1                   | Number  | The number of node groups (shards) for Elasticache                          |
+| cacheNodeReplicas  | 2                   | Number  | The number of replicas per node group for Elasticache                       |
 | auroraInstanceType | t4g.large           | String  | The instance type for Aurora, without db. prefix                            |
-| supersetMemoryLimit| 2048                | Number  | Memory Limit for Superset Service                                           |
-| supersetCPU        | 1024                | Number  | CPU allocation for Superset Service                                         |
+| supersetMemoryLimit| 8192                | Number  | Memory Limit for Superset Service                                           |
+| supersetCPU        | 2048                | Number  | CPU allocation for Superset Service                                         |
 | supersetMinCapacity| 1                   | Number  | Minimum number of tasks for the service                                     |
 | supersetMaxCapacity| 2                   | Number  | Maximum number of tasks for the service                                     |
 | supersetDesiredCount| 1                  | Number  | Desired number of tasks for the service                                     |
